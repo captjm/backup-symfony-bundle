@@ -1,0 +1,68 @@
+{
+  "name": "captjm/backup-symfony-bundle",
+  "type": "symfony-bundle",
+  "description": "Backup symfony databases and upload folders",
+  "keywords": [
+    "backend",
+    "admin",
+    "backup"
+  ],
+  "homepage": "https://github.com/captjm/backup-symfony-bundle",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "David Makaridze",
+      "homepage": "https://github.com/captjm"
+    }
+  ],
+  "require": {
+    "php": ">=8.1",
+    "ext-ctype": "*",
+    "ext-iconv": "*",
+    "ext-zip": "*",
+    "doctrine/doctrine-bundle": "^2.10",
+    "doctrine/doctrine-migrations-bundle": "^3.2",
+    "doctrine/orm": "^2.16",
+    "easycorp/easyadmin-bundle": "^4.7",
+    "sensio/framework-extra-bundle": "^6.2",
+    "symfony/console": "6.3.*",
+    "symfony/dotenv": "6.3.*",
+    "symfony/flex": "^2",
+    "symfony/framework-bundle": "6.3.*",
+    "symfony/runtime": "6.3.*",
+    "symfony/yaml": "6.3.*"
+  },
+  "autoload": {
+    "psr-4": {
+      "Captjm\\BackupSymfonyBundle\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Captjm\\BackupSymfonyBundle\\Tests\\": "tests/"
+    }
+  },
+  "conflict": {
+  },
+  "config": {
+    "sort-packages": true,
+    "allow-plugins": {
+      "symfony/flex": true,
+      "symfony/runtime": true
+    }
+  },
+  "extra": {
+    "branch-alias": {
+      "dev-master": "1.0.x-dev"
+    },
+    "symfony": {
+      "docker": true
+    }
+  },
+  "scripts": {
+    "auto-scripts": {
+      "cache:clear": "symfony-cmd",
+      "assets:install %PUBLIC_DIR%": "symfony-cmd"
+    }
+  }
+}
