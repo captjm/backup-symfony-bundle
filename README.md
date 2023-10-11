@@ -22,6 +22,15 @@ captjm_backup_symfony:
     type: annotation
 ```
 
+Insert in `config/services.yaml`:
+
+```
+services:
+    ...
+    Captjm\BackupSymfonyBundle\Controller\CaptjmBackupSymfonyController:
+        tags: [ 'controller.service_arguments' ]
+```
+
 And then insert in `Controller/Admin/DashboardController.php`:
 
 ``` 

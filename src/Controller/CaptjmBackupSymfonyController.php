@@ -1,6 +1,6 @@
 <?php
 
-namespace Captjm\BackupSymfonyBundle\Controller\Admin;
+namespace Captjm\BackupSymfonyBundle\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Finder\Finder;
@@ -13,7 +13,7 @@ use ZipArchive;
 class CaptjmBackupSymfonyController extends AbstractController
 {
     #[Route(path: 'admin/captjm/backup', name: 'captjm_backup_symfony')]
-    public function dumpData(): Response
+    public function backup(): Response
     {
         $sqlFile = $this->dumpDB();
         return $this->render('dump_data/dump.html.twig', [
