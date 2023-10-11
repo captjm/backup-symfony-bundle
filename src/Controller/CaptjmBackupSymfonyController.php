@@ -2,6 +2,8 @@
 
 namespace Captjm\BackupSymfonyBundle\Controller;
 
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -12,6 +14,20 @@ use ZipArchive;
 
 class CaptjmBackupSymfonyController extends AbstractController
 {
+    private string $backupsDirectory;
+    private string $databaseUrl;
+
+    public function __construct(ParameterBagInterface $parameterBag)
+    {
+        $filesystem = new Filesystem();
+        $this->backupsDirectory = $parameterBag->get('kernel.project_dir') . '/var/backups';
+        if (!$filesystem->exists($this->backupsDirectory)) {
+            $filesystem->mkdir($this->backupsDirectory, 0755);
+        }
+        $this->databaseUrl = $parameterBag->get('captjm.database_url');
+    }
+
+
     #[Route(path: 'admin/captjm/backup', name: 'captjm_backup_symfony')]
     public function backup(): Response
     {
@@ -19,15 +35,14 @@ class CaptjmBackupSymfonyController extends AbstractController
         return $this->render('dump_data/dump.html.twig', [
             'fileName' => $sqlFile,
             'sql' => file_get_contents($sqlFile, false, null, 0, 800),
-            'attachments' => $this->dumpAttachments(),
+            'attachments' => '' //$this->dumpAttachments(),
         ]);
     }
 
     private function dumpDB(): string
     {
-        $conf = parse_url($this->getParameter('app.database_url'));
-        $tmpDir = $this->getParameter('kernel.project_dir') . DIRECTORY_SEPARATOR . 'backups';
-        $sqlFile = $tmpDir . DIRECTORY_SEPARATOR . 'db-' . date('Y-m-d-H-i-s') . '.sql';
+        $conf = parse_url($this->databaseUrl);
+        $sqlFile = $this->backupsDirectory . DIRECTORY_SEPARATOR . 'db-' . date('Y-m-d-H-i-s') . '.sql';
         $dbName = trim($conf['path'], '/');
         $cmd = sprintf('mysqldump -h %s --port %s -u %s --password=%s %s --ignore-table=%s.user > %s',
             $conf['host'],
@@ -46,7 +61,6 @@ class CaptjmBackupSymfonyController extends AbstractController
 
     private function dumpAttachments(): string
     {
-        $tmpDir = $this->getParameter('kernel.project_dir') . DIRECTORY_SEPARATOR . 'tmp';
         $attachmentsDir = implode(DIRECTORY_SEPARATOR, [
             $this->getParameter('kernel.project_dir'),
             'public',
@@ -63,7 +77,7 @@ class CaptjmBackupSymfonyController extends AbstractController
             $zipFilePath
         ]);
         $z = new ZipArchive();
-        $outZipPath = tempnam($tmpDir, '');
+        $outZipPath = tempnam($this->backupsDirectory, '');
         $z->open($outZipPath, ZIPARCHIVE::CREATE);
         foreach ($finder as $file) {
             $z->addFile($file->getRealPath(), $file->getRelativePathname());
@@ -121,8 +135,7 @@ class CaptjmBackupSymfonyController extends AbstractController
             if ($fileName) {
                 $info = pathinfo($fileName);
                 if (key_exists('dirname', $info)) {
-                    $tmpDir = $this->getParameter('kernel.project_dir') . DIRECTORY_SEPARATOR . 'backups';
-                    if ($info['dirname'] === $tmpDir) {
+                    if ($info['dirname'] === $this->backupsDirectory) {
                         $data = file_get_contents($fileName);
                         $response = new Response($data);
                         $response->headers->set('Content-Disposition', sprintf('attachment; filename="%s"', $info['basename']));

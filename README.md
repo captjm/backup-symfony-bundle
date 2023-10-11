@@ -17,7 +17,7 @@ $ composer require captjm/backup-symfony-bundle
 Insert in `config/routes.yaml`:
 
 ```
-captjm_backup_symfony:
+captjm_backup:
     resource: '../vendor/captjm/backup-symfony-bundle/src/Controller/'
     type: annotation
 ```
@@ -25,8 +25,12 @@ captjm_backup_symfony:
 Insert in `config/services.yaml`:
 
 ```
+parameters:
+
+    captjm.database_url: '%env(DATABASE_URL)%'
+    
 services:
-    ...
+
     Captjm\BackupSymfonyBundle\Controller\CaptjmBackupSymfonyController:
         tags: [ 'controller.service_arguments' ]
 ```
@@ -37,7 +41,7 @@ And then insert in `Controller/Admin/DashboardController.php`:
 public function configureMenuItems(): iterable
 {
     ....
-    yield MenuItem::linkToRoute('Backup', 'fas fa-download', 'captjm_backup_symfony');
+    yield MenuItem::linkToRoute('Backup', 'fas fa-download', 'captjm_backup');
     ....
 }    
 ```
