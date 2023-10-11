@@ -28,7 +28,7 @@ And then insert in `Controller/Admin/DashboardController.php`:
 public function configureMenuItems(): iterable
 {
     ....
-    yield MenuItem::linkToRoute('Dump DB', 'fas fa-download', 'admin_dump_data');
+    yield MenuItem::linkToRoute('Backup', 'fas fa-download', 'captjm_backup_symfony');
     ....
 }    
 ```

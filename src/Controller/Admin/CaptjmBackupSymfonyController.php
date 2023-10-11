@@ -10,11 +10,9 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use ZipArchive;
 
-class DumpDataController extends AbstractController
+class CaptjmBackupSymfonyController extends AbstractController
 {
-    /**
-     * @Route("/admin/dump/data", name="admin_dump_data")
-     */
+    #[Route(name: 'captjm_backup_symfony')]
     public function dumpData(): Response
     {
         $sqlFile = $this->dumpDB();
