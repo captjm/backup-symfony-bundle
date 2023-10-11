@@ -32,7 +32,7 @@ class CaptjmBackupSymfonyController extends AbstractController
     public function backup(): Response
     {
         $sqlFile = $this->dumpDB();
-        return $this->render('dump_data/dump.html.twig', [
+        return $this->render('@CaptjmBackupSymfony/captjm_backup.html.twig', [
             'fileName' => $sqlFile,
             'sql' => file_get_contents($sqlFile, false, null, 0, 800),
             'attachments' => '' //$this->dumpAttachments(),
