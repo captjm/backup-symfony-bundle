@@ -32,7 +32,10 @@ parameters:
 services:
 
     Captjm\BackupSymfonyBundle\Controller\CaptjmBackupSymfonyController:
-        tags: [ 'controller.service_arguments' ]
+        tags:
+            - 'controller.service_arguments'
+        arguments:
+            - '@parameter_bag'
 ```
 
 And then insert in `Controller/Admin/DashboardController.php`:
