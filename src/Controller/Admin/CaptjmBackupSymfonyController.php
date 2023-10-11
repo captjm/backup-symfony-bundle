@@ -12,7 +12,7 @@ use ZipArchive;
 
 class CaptjmBackupSymfonyController extends AbstractController
 {
-    #[Route(name: 'captjm_backup_symfony')]
+    #[Route(path: 'admin/captjm/backup', name: 'captjm_backup_symfony')]
     public function dumpData(): Response
     {
         $sqlFile = $this->dumpDB();
