@@ -6,121 +6,113 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
+use Symfony\Component\Form\ChoiceList\Loader\CallbackChoiceLoader;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
+use Symfony\Component\Form\Extension\Core\Type\SubmitType;
+use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Form\Form;
 
 class CaptjmBackupSymfonyController extends AbstractController
 {
     private string $backupsDirectory;
     private string $databaseUrl;
+    private Filesystem $filesystem;
 
     public function __construct(ParameterBagInterface $parameterBag)
     {
-        $filesystem = new Filesystem();
+        $this->filesystem = new Filesystem();
         $this->backupsDirectory = $parameterBag->get('kernel.project_dir') . '/var/backups';
-        if (!$filesystem->exists($this->backupsDirectory)) {
-            $filesystem->mkdir($this->backupsDirectory, 0755);
+        if (!$this->filesystem->exists($this->backupsDirectory)) {
+            $this->filesystem->mkdir($this->backupsDirectory, 0755);
         }
         $this->databaseUrl = $parameterBag->get('captjm.database_url');
     }
 
 
     #[Route(path: 'admin/captjm/backup', name: 'captjm_backup_symfony')]
-    public function backup(): Response
+    public function backup(Request $request): Response
     {
-        $finder = new Finder();
-        $conf = parse_url($this->databaseUrl);
-        $sqlFile = $this->backupsDirectory . DIRECTORY_SEPARATOR . 'db-' . date('Y-m-d-H-i-s') . '.sql';
-        $dbName = trim($conf['path'], '/');
-        $cmd = sprintf(
-            'mysqldump -h %s --port %s -u %s --password=%s %s --ignore-table=%s.user > %s',
-            $conf['host'], $conf['port'], $conf['user'], $conf['pass'], $dbName, $dbName, $sqlFile
-        );
-        $output = [];
-        $exit_status = null;
-        exec($cmd, $output, $exit_status);
-        $finder->files()->in($this->backupsDirectory)->files()->name('*.sql');
+        $form = $this->generateForm();
 
-        if ($finder->hasResults()) {
-            $choices = [];
-            foreach ($finder as $key => $file) {
-                $choices[$key] = $file->getFilename();
+        $form->handleRequest($request);
+        if ($form->isSubmitted() && $form->isValid()) {
+            $backups = $form->getData()['backups'];
+            if ($form->get('backup')->isClicked()) {
+                $conf = parse_url($this->databaseUrl);
+                $sqlFile = $this->backupsDirectory . DIRECTORY_SEPARATOR . 'db-' . date('Y-m-d-H-i-s') . '.sql';
+                $dbName = trim($conf['path'], '/');
+                $cmd = sprintf(
+                    'mysqldump -h %s --port %s -u %s --password=%s %s --ignore-table=%s.user > %s',
+                    $conf['host'], $conf['port'], $conf['user'], $conf['pass'], $dbName, $dbName, $sqlFile
+                );
+                $output = [];
+                $exit_status = null;
+                exec($cmd, $output, $exit_status);
+                $form = $this->generateForm();
+            } elseif ($form->get('download')->isClicked()) {
+                if (count($backups) === 1) {
+                    $responseFile = $backups[0];
+                    $deleteFileAfterSend = false;
+                } elseif (count($backups) > 1) {
+                    $zip = new \ZipArchive();
+                    $responseFile = 'db-backups-' . date('Y-m-d-H-i-s') . '.zip';
+                    if ($zip->open($this->backupsDirectory . DIRECTORY_SEPARATOR . $responseFile,
+                            \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true) {
+                        foreach ($backups as $fileName) {
+                            $zip->addFile($this->backupsDirectory . DIRECTORY_SEPARATOR . $fileName, $fileName);
+                        }
+                        $zip->close();
+                    }
+                    $deleteFileAfterSend = true;
+                } else {
+                    $responseFile = null;
+                }
+                if ($responseFile) {
+                    $response = new BinaryFileResponse($this->backupsDirectory . DIRECTORY_SEPARATOR . $responseFile);
+                    $response->headers->set('Content-Type', 'text/plain');
+                    $response->headers->set('Content-Disposition',
+                        sprintf('attachment; filename="%s"', $responseFile));
+                    $response->headers->set('Content-Type', 'text/plain; charset=UTF-8');
+                    $response->deleteFileAfterSend($deleteFileAfterSend);
+                    return $response;
+                }
+            } elseif ($form->get('delete')->isClicked()) {
+                foreach ($backups as $backup) {
+                    $this->filesystem->remove($this->backupsDirectory . DIRECTORY_SEPARATOR . $backup);
+                }
+                $form = $this->generateForm();
             }
-            $form = $this->createFormBuilder()
-                ->add('backups', ChoiceType::class,
-                    [
-                        'choices' => $choices,
-                        'expanded' => true,
-                        'multiple' => true,
-                    ])
-                ->getForm();
         }
 
-
         return $this->render('@CaptjmBackupSymfony/captjm_backup.html.twig', [
-            'fileName' => $sqlFile,
             'form' => $form,
-            'sql' => file_get_contents($sqlFile, false, null, 0, 800),
         ]);
     }
 
-    #[Route(path: 'admin/captjm/get/dump/{name}/{key}', name: 'get_dump')]
-    public function getDump($name, $key)
+    private function generateForm(): FormInterface
     {
-        $secret = $this->getParameter('app.dump_key');
-        if ($key === $secret) {
-            if ($name === 'db') {
-                $file = $this->dumpDB();
-                $info = pathinfo($file);
-                $responseFile = implode(DIRECTORY_SEPARATOR, [
-                    $this->getParameter('kernel.project_dir'),
-                    'public',
-                    'data',
-                    $info['basename']
-                ]);
-                rename($file, $responseFile);
-            } elseif ($name === 'attachment') {
-                $responseFile = implode(DIRECTORY_SEPARATOR, [
-                    $this->getParameter('kernel.project_dir'),
-                    'public',
-                    'data',
-                    $this->dumpAttachments()
-                ]);
-            } else {
-                return new Response();
-            }
-            $response = new BinaryFileResponse($responseFile);
-            $response->headers->set('Content-Type', 'text/plain');
-
-            $response->headers->set('Content-Disposition', sprintf('attachment; filename="%s"', pathinfo($responseFile)['basename']));
-            $response->headers->set('Content-Type', 'text/plain; charset=UTF-8');
-            return $response;
-        } else {
-            return new Response();
-        }
-    }
-
-    #[Route(path: 'admin/captjm/download', name: 'admin_download_file')]
-    public function downloadFile(Request $request)
-    {
-        if (in_array('ROLE_SUPER_ADMIN', $this->getUser()->getRoles())) {
-            $fileName = $request->query->get('f');
-            if ($fileName) {
-                $info = pathinfo($fileName);
-                if (key_exists('dirname', $info)) {
-                    if ($info['dirname'] === $this->backupsDirectory) {
-                        $data = file_get_contents($fileName);
-                        $response = new Response($data);
-                        $response->headers->set('Content-Disposition', sprintf('attachment; filename="%s"', $info['basename']));
-                        $response->headers->set('Content-Type', 'text/plain; charset=UTF-8');
-                        return $response;
-                    }
-                }
+        $choices = [];
+        $finder = new Finder();
+        $finder->files()->in($this->backupsDirectory)->name('*.sql');
+        if ($finder->hasResults()) {
+            foreach ($finder as $file) {
+                $choices[$file->getFilename()] = $file->getFilename();
             }
         }
-        return new BinaryFileResponse(null);
+        return $this->createFormBuilder()
+            ->add('backups', ChoiceType::class,
+                [
+                    'choices' => $choices,
+                    'expanded' => true,
+                    'multiple' => true,
+                ])
+            ->add('backup', SubmitType::class)
+            ->add('download', SubmitType::class)
+            ->add('delete', SubmitType::class)
+            ->getForm();
     }
 }

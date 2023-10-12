@@ -4,24 +4,23 @@
     <div class="container">
         <div class="row">
             <div class="col-12">
+                {{ form_start(form) }}
+                {{ form_row(form.backups) }}
+                {{ form_end(form) }}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
                 <pre style="height: 70vh;overflow: scroll;">
-                    {{ sql }}
+
                 </pre>
             </div>
         </div>
         <div class="row">
             <div class="col-12">
-                <a class="btn btn-light me-5"
-                   target="_blank"
-                   href="{{ path('admin_download_file', {f: fileName}) }}">
-                    Download
-                </a>
+
             </div>
         </div>
-        <div class="row">
-            <div class="col-12">
-                {{ form(form) }}
-            </div>
-        </div>
+
     </div>
 {% endblock %}
