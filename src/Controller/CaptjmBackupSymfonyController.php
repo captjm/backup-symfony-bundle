@@ -2,15 +2,15 @@
 
 namespace Captjm\BackupSymfonyBundle\Controller;
 
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Finder\Finder;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
-use ZipArchive;
 
 class CaptjmBackupSymfonyController extends AbstractController
 {
@@ -31,65 +31,43 @@ class CaptjmBackupSymfonyController extends AbstractController
     #[Route(path: 'admin/captjm/backup', name: 'captjm_backup_symfony')]
     public function backup(): Response
     {
-        $sqlFile = $this->dumpDB();
-        return $this->render('@CaptjmBackupSymfony/captjm_backup.html.twig', [
-            'fileName' => $sqlFile,
-            'sql' => file_get_contents($sqlFile, false, null, 0, 800),
-            'attachments' => '' //$this->dumpAttachments(),
-        ]);
-    }
-
-    private function dumpDB(): string
-    {
+        $finder = new Finder();
         $conf = parse_url($this->databaseUrl);
         $sqlFile = $this->backupsDirectory . DIRECTORY_SEPARATOR . 'db-' . date('Y-m-d-H-i-s') . '.sql';
         $dbName = trim($conf['path'], '/');
-        $cmd = sprintf('mysqldump -h %s --port %s -u %s --password=%s %s --ignore-table=%s.user > %s',
-            $conf['host'],
-            $conf['port'],
-            $conf['user'],
-            $conf['pass'],
-            $dbName,
-            $dbName,
-            $sqlFile
+        $cmd = sprintf(
+            'mysqldump -h %s --port %s -u %s --password=%s %s --ignore-table=%s.user > %s',
+            $conf['host'], $conf['port'], $conf['user'], $conf['pass'], $dbName, $dbName, $sqlFile
         );
         $output = [];
         $exit_status = null;
         exec($cmd, $output, $exit_status);
-        return $sqlFile;
-    }
+        $finder->files()->in($this->backupsDirectory)->files()->name('*.sql');
 
-    private function dumpAttachments(): string
-    {
-        $attachmentsDir = implode(DIRECTORY_SEPARATOR, [
-            $this->getParameter('kernel.project_dir'),
-            'public',
-            'uploads',
-            'attachments'
-        ]);
-        $finder = new Finder();
-        $finder->files()->in($attachmentsDir);
-        $zipFilePath = 'faw-attachments-' . date('Y-m-d-H-i-s') . '.zip';
-        $zipFileName = implode(DIRECTORY_SEPARATOR, [
-            $this->getParameter('kernel.project_dir'),
-            'public',
-            'data',
-            $zipFilePath
-        ]);
-        $z = new ZipArchive();
-        $outZipPath = tempnam($this->backupsDirectory, '');
-        $z->open($outZipPath, ZIPARCHIVE::CREATE);
-        foreach ($finder as $file) {
-            $z->addFile($file->getRealPath(), $file->getRelativePathname());
+        if ($finder->hasResults()) {
+            $choices = [];
+            foreach ($finder as $key => $file) {
+                $choices[$key] = $file->getFilename();
+            }
+            $form = $this->createFormBuilder()
+                ->add('backups', ChoiceType::class,
+                    [
+                        'choices' => $choices,
+                        'expanded' => true,
+                        'multiple' => true,
+                    ])
+                ->getForm();
         }
-        $z->close();
-        rename($outZipPath, $zipFileName);
-        return $zipFilePath;
+
+
+        return $this->render('@CaptjmBackupSymfony/captjm_backup.html.twig', [
+            'fileName' => $sqlFile,
+            'form' => $form,
+            'sql' => file_get_contents($sqlFile, false, null, 0, 800),
+        ]);
     }
 
-    /**
-     * @Route("/get/dump/{name}/{key}", name="get_dump")
-     */
+    #[Route(path: 'admin/captjm/get/dump/{name}/{key}', name: 'get_dump')]
     public function getDump($name, $key)
     {
         $secret = $this->getParameter('app.dump_key');
@@ -125,9 +103,7 @@ class CaptjmBackupSymfonyController extends AbstractController
         }
     }
 
-    /**
-     * @Route("/admin/download/file", name="admin_download_file")
-     */
+    #[Route(path: 'admin/captjm/download', name: 'admin_download_file')]
     public function downloadFile(Request $request)
     {
         if (in_array('ROLE_SUPER_ADMIN', $this->getUser()->getRoles())) {

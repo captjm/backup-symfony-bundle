@@ -1,5 +1,5 @@
 {% extends '@EasyAdmin/page/content.html.twig' %}
-
+{% form_theme form 'bootstrap_5_layout.html.twig' %}
 {% block page_content %}
     <div class="container">
         <div class="row">
@@ -16,11 +16,11 @@
                    href="{{ path('admin_download_file', {f: fileName}) }}">
                     Download
                 </a>
-                <a class="btn btn-light"
-                   target="_blank"
-                   href="/data/{{ attachments }}">
-                    Download Attachments
-                </a>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                {{ form(form) }}
             </div>
         </div>
     </div>
